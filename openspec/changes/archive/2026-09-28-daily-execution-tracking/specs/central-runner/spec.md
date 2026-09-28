@@ -1,8 +1,5 @@
-# central-runner Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change forms-checker-suite. Update Purpose after archive.
-## Requirements
 ### Requirement: Auto-discovery of checks
 `run.py` SHALL discover check modules by globbing `checks/*.py` (excluding `__init__.py` and `_*.py`) and invoking the selected module's `check(page)` function. Discovery defines the candidate set; the execution-tracking selection rules decide which single candidate runs in a given invocation.
 
@@ -35,4 +32,3 @@ The runner SHALL save `failures/<site>.png` when the executed check fails, print
 #### Scenario: Skipped run stays silent and green
 - **WHEN** no site is due
 - **THEN** no email is sent and the exit code is zero
-

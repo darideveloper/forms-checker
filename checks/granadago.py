@@ -8,7 +8,7 @@ MESSAGE = "this is a periodic check of the contact form. If you keep getting the
 def check(page):
     page.goto("https://granadago.com/")
     page.get_by_role("link", name="Contacto").click()
-    page.get_by_role("textbox", name="Nombressssss").fill(NAME)
+    page.get_by_role("textbox", name="Nombre").fill(NAME)
     page.get_by_role("textbox", name="Correo electrónico").fill(EMAIL)
     page.get_by_role("textbox", name="Mensaje").fill(MESSAGE)
     page.get_by_role("button", name="Enviar").click()
