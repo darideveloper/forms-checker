@@ -6,6 +6,8 @@ import os
 import smtplib
 import ssl
 import sys
+import time
+from datetime import datetime
 from email.message import EmailMessage
 
 from dotenv import load_dotenv
@@ -19,6 +21,10 @@ FAILURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "failure
 SMTP_KEYS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "ALERT_TO", "ALERT_FROM"]
 
 
+def log(msg):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
 def discover_checks():
     return sorted(
         os.path.splitext(os.path.basename(p))[0]
@@ -30,7 +36,7 @@ def discover_checks():
 def send_alert(failures):
     missing = [k for k in SMTP_KEYS if not os.getenv(k)]
     if missing:
-        print(f"Cannot send alert email, missing env keys: {', '.join(missing)} (see .env.example).")
+        log(f"Cannot send alert email, missing env keys: {', '.join(missing)} (see .env.example).")
         return
     host = os.environ["SMTP_HOST"]
     port = int(os.environ["SMTP_PORT"])
@@ -60,6 +66,7 @@ def send_alert(failures):
             if os.environ["SMTP_USER"]:
                 s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASS"])
             s.send_message(msg)
+    log(f"Alert sent to {os.environ['ALERT_TO']}.")
 
 
 def main():
@@ -67,11 +74,19 @@ def main():
     os.makedirs(FAILURES_DIR, exist_ok=True)
     failures = []
     passed = []
+    sites = discover_checks()
+    total = len(sites)
+    log(f"Starting contact form checks ({total} site{'s' if total != 1 else ''} found).")
+    started = time.monotonic()
+    log(f"Launching Chrome (headless={headless})...")
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(channel="chrome", headless=headless)
-        for name in discover_checks():
+        for i, name in enumerate(sites, 1):
             context = None
             page = None
+            log(f"({i}/{total}) Checking {name}...")
+            site_started = time.monotonic()
+            shot = os.path.join(FAILURES_DIR, f"{name}.png")
             try:
                 module = importlib.import_module(f"checks.{name}")
                 check = getattr(module, "check", None)
@@ -81,29 +96,32 @@ def main():
                 page = context.new_page()
                 try:
                     check(page)
+                except Exception:
+                    try:
+                        page.screenshot(path=shot)
+                    except Exception as shot_e:
+                        log(f"  Could not save screenshot: {type(shot_e).__name__}: {shot_e}")
+                        shot = ""
+                    raise
                 finally:
                     context.close()
                     context = None
             except Exception as e:  # continue-on-error
-                shot = os.path.join(FAILURES_DIR, f"{name}.png")
-                try:
-                    if page is not None:
-                        page.screenshot(path=shot)
-                    else:
-                        shot = ""
-                except Exception:
+                if not (shot and os.path.exists(shot)):
                     shot = ""
-                finally:
-                    if context is not None:
-                        context.close()
+                if context is not None:
+                    context.close()
                 failures.append((name, f"{type(e).__name__}: {e}", shot if shot and os.path.exists(shot) else ""))
-                print(f"FAIL {name}: {type(e).__name__}: {e}")
+                log(f"  FAIL {name} ({time.monotonic() - site_started:.1f}s): {type(e).__name__}: {e}")
+                if shot and os.path.exists(shot):
+                    log(f"  Screenshot saved: {shot}")
             else:
                 passed.append(name)
-                print(f"PASS {name}")
+                log(f"  PASS {name} ({time.monotonic() - site_started:.1f}s)")
         browser.close()
-    print(f"\n{len(passed)} passed, {len(failures)} failed.")
+    log(f"{len(passed)} passed, {len(failures)} failed in {time.monotonic() - started:.1f}s.")
     if failures:
+        log(f"Sending failure alert to {os.getenv('ALERT_TO', '(no ALERT_TO set)')}...")
         send_alert(failures)
         sys.exit(1)
 
