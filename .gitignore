@@ -1,0 +1,12 @@
+.env
+failures/
+venv/
+.playwright-cli/
+__pycache__/
+*.pyc
+
+# Ignore proposals
+openspec/changes/*
+
+# Do not ignore archived proposals
+!openspec/changes/archive/
