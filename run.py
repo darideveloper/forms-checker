@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 import glob
 import importlib
-import mimetypes
 import os
 import smtplib
 import ssl
 import sys
 import time
 from datetime import datetime
-from email.message import EmailMessage
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
@@ -40,32 +41,55 @@ def send_alert(failures):
         return
     host = os.environ["SMTP_HOST"]
     port = int(os.environ["SMTP_PORT"])
-    msg = EmailMessage()
-    msg["Subject"] = f"Contact form check failed: {', '.join(n for n, _, _ in failures)}"
-    msg["From"] = os.environ["ALERT_FROM"]
-    msg["To"] = os.environ["ALERT_TO"]
-    msg.set_content(
-        "Failed contact form checks:\n\n"
-        + "\n\n".join(f"- {name}: {err}\n  screenshot: {shot}" for name, err, shot in failures)
+
+    text_body = "Failed contact form checks:\n\n" + "\n\n".join(
+        f"- {name}: {err}\n  screenshot: {shot}" for name, err, shot in failures
     )
+    html_parts = []
+    for name, err, shot in failures:
+        img = f'<img src="cid:{name}" alt="{name} screenshot" style="max-width:100%;border:1px solid #ccc">' if shot and os.path.exists(shot) else "<em>no screenshot</em>"
+        html_parts.append(f"<h3>{name}</h3><pre>{err}</pre>{img}")
+    html_body = "<html><body>" + "".join(html_parts) + "</body></html>"
+
+    root = MIMEMultipart("mixed")
+    root["Subject"] = f"Contact form check failed: {', '.join(n for n, _, _ in failures)}"
+    root["From"] = os.environ["ALERT_FROM"]
+    root["To"] = os.environ["ALERT_TO"]
+
+    related = MIMEMultipart("related")
+    alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(text_body, "plain", "utf-8"))
+    alt.attach(MIMEText(html_body, "html", "utf-8"))
+    related.attach(alt)
+    for name, _, shot in failures:
+        if shot and os.path.exists(shot):
+            with open(shot, "rb") as f:
+                data = f.read()
+            inline = MIMEImage(data, "png")
+            inline.add_header("Content-ID", f"<{name}>")
+            inline.add_header("Content-Disposition", "inline", filename=os.path.basename(shot))
+            related.attach(inline)
+    root.attach(related)
+
     for _, _, shot in failures:
         if shot and os.path.exists(shot):
-            ctype, _ = mimetypes.guess_type(shot)
-            maintype, subtype = (ctype or "image/png").split("/", 1)
             with open(shot, "rb") as f:
-                msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(shot))
+                att = MIMEImage(f.read(), "png")
+            att.add_header("Content-Disposition", "attachment", filename=os.path.basename(shot))
+            root.attach(att)
+
     if port == 465:
         with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context()) as s:
             if os.environ["SMTP_USER"]:
                 s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASS"])
-            s.send_message(msg)
+            s.send_message(root)
     else:
         with smtplib.SMTP(host, port) as s:
             if port == 587:
                 s.starttls(context=ssl.create_default_context())
             if os.environ["SMTP_USER"]:
                 s.login(os.environ["SMTP_USER"], os.environ["SMTP_PASS"])
-            s.send_message(msg)
+            s.send_message(root)
     log(f"Alert sent to {os.environ['ALERT_TO']}.")
 
 

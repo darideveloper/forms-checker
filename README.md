@@ -42,7 +42,7 @@ python run.py
 ## Failure alerts and screenshots
 
 - No email is sent when all checks pass.
-- When at least one check fails, exactly one summary email goes to `ALERT_TO` listing each failed site with its error; each site's `failures/<site>.png` screenshot is attached.
+- When at least one check fails, exactly one summary email goes to `ALERT_TO` listing each failed site with its error; each site's `failures/<site>.png` screenshot is shown inline in the email body and also attached as a downloadable file.
 - If SMTP keys are missing at alert time, the runner prints the missing key names instead of sending a partial email.
 - `failures/` is gitignored; each run overwrites that site's screenshot.
 

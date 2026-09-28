@@ -15,7 +15,7 @@ Playwright-based contact-form monitoring for client websites.
 - **Check contract**: `check(page)` — fills with the script's own sender data, really submits, asserts the visible success message with `expect(...).to_be_visible(timeout=15000)`. Checks never launch browsers or read env themselves; they raise on failure.
 - **Browser**: Chromium via `playwright.chromium.launch(channel="chrome", headless=HEADLESS)` — requires Chrome installed; `HEADLESS` defaults to `true`, set `false` for headed debugging.
 - **Discovery**: glob `checks/*.py`, skip `__init__.py` and `_*.py`; a module without `check` is recorded as that site's failure.
-- **Alerting**: stdlib `smtplib` only; one email on failure (failed sites + errors + PNG attachments), silence on full pass; security auto-selected by port (465 SSL / 587 STARTTLS / else plain).
+- **Alerting**: stdlib `smtplib` only; one email on failure (failed sites + errors + screenshots shown inline via `cid:` and attached as files), silence on full pass; security auto-selected by port (465 SSL / 587 STARTTLS / else plain).
 - **No tests, no lint, no typecheck** — pure automation scripts.
 
 ## OpenSpec workflow
