@@ -2,7 +2,7 @@ from playwright.sync_api import expect
 
 NAME = "daridev"
 EMAIL = "me@darideveloper.com"
-MESSAGE = "this is a periodic check of the contact form. If you keep getting these messages, let me know asap."
+MESSAGE = "this is a periodic check of the contact form. If you STOPPED getting these messages, let me know asap."
 
 
 def check(page):
