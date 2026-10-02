@@ -1,6 +1,7 @@
 .env
 failures/
 executions.db
+cron.log
 venv/
 .playwright-cli/
 __pycache__/
